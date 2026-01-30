@@ -2,10 +2,13 @@
 
 from __future__ import annotations
 
+import csv
+import io
 import os
 from pathlib import Path
 
 from fastapi import FastAPI, HTTPException
+from fastapi.responses import StreamingResponse
 from pydantic import BaseModel
 
 from agents.code_agent import run_code_agent
@@ -13,19 +16,16 @@ from agents.reviewer_agent.chain import ReviewerAgentChain
 
 app = FastAPI(title="Coding Agents API", version="0.1.0")
 
-
 class CodeRequest(BaseModel):
     issue: int
     repo: str
     max_iters: int = 5
-
 
 class ReviewRequest(BaseModel):
     pr: int
     repo: str
     ci_conclusion: str = "success"
     ci_summary: str = ""
-
 
 @app.post("/code")
 def api_code(req: CodeRequest) -> dict:
@@ -41,7 +41,6 @@ def api_code(req: CodeRequest) -> dict:
         "pr_number": result.pr_number,
         "message": result.message,
     }
-
 
 @app.post("/review")
 def api_review(req: ReviewRequest) -> dict:
@@ -59,11 +58,26 @@ def api_review(req: ReviewRequest) -> dict:
     )
     return {"verdict": out.verdict, "reason": out.reason, "summary": out.summary}
 
-
 @app.get("/health")
 def health() -> dict:
     return {"status": "ok"}
 
+@app.get("/items/export/csv")
+def export_items_to_csv():
+    # Example data, replace with actual data retrieval logic
+    data = [
+        {"id": 1, "name": "Item 1", "description": "Description 1"},
+        {"id": 2, "name": "Item 2", "description": "Description 2"},
+    ]
+    output = io.StringIO()
+    writer = csv.DictWriter(output, fieldnames=data[0].keys())
+    writer.writeheader()
+    for row in data:
+        writer.writerow(row)
+    output.seek(0)
+    return StreamingResponse(output, media_type="text/csv", headers={
+        "Content-Disposition": "attachment; filename=items.csv"
+    })
 
 def run_serve(host: str = "0.0.0.0", port: int = 8000) -> None:
     import uvicorn

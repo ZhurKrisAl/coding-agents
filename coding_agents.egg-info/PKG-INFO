@@ -1,0 +1,156 @@
+Metadata-Version: 2.4
+Name: coding-agents
+Version: 0.1.0
+Summary: Automated agentic SDLC system using GitHub Issues, PRs, and Actions
+Author: Coding Agents Team
+License: MIT
+Requires-Python: >=3.11
+Description-Content-Type: text/markdown
+Requires-Dist: langchain>=0.3.0
+Requires-Dist: langchain-openai>=0.2.0
+Requires-Dist: langchain-core>=0.3.0
+Requires-Dist: langfuse>=2.0.0
+Requires-Dist: PyGithub>=2.4.0
+Requires-Dist: GitPython>=3.1.40
+Requires-Dist: typer[all]>=0.12.0
+Requires-Dist: pydantic>=2.0.0
+Requires-Dist: httpx>=0.27.0
+Requires-Dist: python-dotenv>=1.0.0
+Requires-Dist: structlog>=24.0.0
+Requires-Dist: fastapi>=0.115.0
+Requires-Dist: uvicorn[standard]>=0.32.0
+Provides-Extra: dev
+Requires-Dist: ruff>=0.8.0; extra == "dev"
+Requires-Dist: black>=24.0.0; extra == "dev"
+Requires-Dist: mypy>=1.13.0; extra == "dev"
+Requires-Dist: pytest>=8.0.0; extra == "dev"
+Requires-Dist: pytest-asyncio>=0.24.0; extra == "dev"
+
+# Coding Agents
+
+Автоматизированная агентная система для полного SDLC внутри GitHub с использованием **только** GitHub Issues, Pull Requests и GitHub Actions. Система имитирует работу разработчика (Code Agent) и ревьюера (Reviewer Agent): читает Issue, вносит изменения, создаёт PR, запускает CI/CD, анализирует результаты и принимает решение «завершить или повторить цикл исправлений» до корректного результата или достижения лимита итераций.
+
+## Быстрый старт
+
+### Требования
+
+- Python 3.11+
+- Git
+- (Опционально) Docker и docker-compose
+
+### Локальный запуск
+
+```bash
+# Клонирование и установка (рекомендуется venv)
+git clone <repo-url> coding-agents && cd coding-agents
+python3 -m venv .venv && source .venv/bin/activate  # или .venv\Scripts\activate на Windows
+pip install -e ".[dev]"
+
+# Переменные окружения (создайте .env или экспортируйте)
+export GITHUB_TOKEN=ghp_xxx          # Токен с правами repo, issues, pull_requests
+export OPENAI_API_KEY=sk-xxx         # Для Code Agent и Reviewer (по умолчанию GPT-4o-mini)
+# Опционально: Langfuse
+export LANGFUSE_PUBLIC_KEY=pk_xxx
+export LANGFUSE_SECRET_KEY=sk_xxx
+export LANGFUSE_HOST=https://cloud.langfuse.com
+
+# CLI
+coding-agents code --issue 1 --repo owner/repo
+coding-agents review --pr 2 --repo owner/repo
+coding-agents serve   # FastAPI для webhook/API
+```
+
+### Docker
+
+Из корня репозитория:
+
+```bash
+# Задайте переменные (или создайте .env в корне)
+export GITHUB_TOKEN=ghp_xxx OPENAI_API_KEY=sk_xxx
+# опционально: LANGFUSE_PUBLIC_KEY, LANGFUSE_SECRET_KEY, GITHUB_REPOSITORY
+
+# Поднять сервис (образ строится из docker/Dockerfile)
+docker-compose up -d
+
+# Запуск CLI внутри контейнера
+docker-compose exec coding-agents coding-agents code --issue 1 --repo owner/repo
+docker-compose exec coding-agents coding-agents review --pr 2 --repo owner/repo
+```
+
+**API:** для запуска FastAPI: `docker-compose --profile api up -d coding-agents-api` — сервис будет на порту 8000.
+
+Переменные окружения для Docker задаются в `docker-compose.yml` или через `.env` в корне проекта (см. секцию «Переменные окружения»).
+
+## Архитектура
+
+```
+coding-agents/
+├── agents/
+│   ├── code_agent/       # Code Agent: Issue → план → изменения → коммиты → PR
+│   └── reviewer_agent/   # Reviewer Agent: Issue + diff + CI → вердикт + комментарии + Review
+├── core/
+│   ├── github/           # PyGithub: Issues, PR, Checks, Reviews
+│   ├── git/              # GitPython: ветки, коммиты, патчи
+│   ├── llm/              # Адаптеры OpenAI / YandexGPT, единый интерфейс
+│   ├── prompts/          # Шаблоны промптов + registry
+│   ├── policies/         # Итерации, стоп-условия, лимиты
+│   └── observability/    # Langfuse: traces, spans, prompt versions
+├── cli/                  # Typer CLI: coding-agents
+├── .github/workflows/    # issue_to_pr, ci, reviewer
+├── docker/
+│   └── Dockerfile
+├── docker-compose.yml   # запуск: docker-compose up -d
+├── docs/
+│   └── demo_issues.md    # Примеры Issue для демо
+├── tests/
+├── pyproject.toml
+├── README.md
+├── REPORT.md
+└── CONTRIBUTING.md
+```
+
+**Две изолированные стороны:**
+
+- **Code Agent** и **Reviewer Agent** — отдельные модули, отдельные промпты, отдельные policy-правила.
+- Reviewer не получает «скрытых подсказок» от Code Agent и выносит вердикт строго по **Issue + diff + результатам CI** (Pass/Fail + причины).
+- Code Agent реагирует на «Fail» от Reviewer и пытается исправить (до лимита итераций).
+
+## Команды CLI
+
+| Команда | Описание |
+|--------|----------|
+| `coding-agents code --issue <id> [--repo <owner/repo>] [--max-iters N]` | Запуск Code Agent по Issue: создание ветки, правки, коммиты, PR. |
+| `coding-agents review --pr <num> [--repo <owner/repo>]` | Запуск Reviewer Agent: анализ PR, комментарий, summary, GitHub Review (approve/request changes + inline). |
+| `coding-agents serve` | Запуск FastAPI-сервиса для вызова логики по API/webhook. |
+
+## Переменные окружения
+
+| Переменная | Описание |
+|------------|----------|
+| `GITHUB_TOKEN` | GitHub Personal Access Token (repo, issues, pull_requests). |
+| `OPENAI_API_KEY` | Ключ OpenAI (по умолчанию GPT-4o-mini). |
+| `YANDEX_API_KEY`, `YANDEX_FOLDER_ID` | Для YandexGPT (если выбран провайдер yandex). |
+| `LANGFUSE_PUBLIC_KEY`, `LANGFUSE_SECRET_KEY`, `LANGFUSE_HOST` | Langfuse (опционально; при отсутствии — graceful degradation). |
+| `CODING_AGENTS_LLM_PROVIDER` | `openai` (по умолчанию) или `yandex`. |
+
+## Воспроизведение демо
+
+1. Создайте Issue в репозитории с задачей (см. примеры в `docs/demo_issues.md`).
+2. Поставьте label `agent:run` или настройте workflow на `issues: opened`.
+3. Workflow **issue_to_pr** запустит Code Agent → создаст ветку `agent/issue-<id>-<slug>`, внесёт изменения, откроет PR с «Closes #<id>».
+4. На PR запустится **ci** (ruff, black, mypy, pytest).
+5. После CI запустится **reviewer** workflow → Reviewer Agent опубликует комментарий, summary и GitHub Review.
+6. При «Request changes» (или при провале CI) можно настроить повторный вызов Code Agent (итерации) с лимитом (например, 3–5). Остановка по стоп-условиям: успех (CI зелёный + approve) или достижение max iterations.
+
+**Safeguards:** лимит итераций (например, `--max-iters 5`), детерминированная остановка, отсутствие авто-мержа без явного флага.
+
+## Качество и Langfuse
+
+- **Локально:** ruff, black, mypy, pytest (см. `pyproject.toml` и `CONTRIBUTING.md`).
+- **В CI:** те же инструменты в `ci.yml`.
+
+Чтобы проверить качество работы агентов, откройте **Langfuse**: каждый запуск агента = trace, этапы = spans, промпты версионируются, метаданные (issue_id, pr_number, repo, iteration, CI conclusion, model). Без заданных env vars Langfuse логирование отключается (graceful degradation).
+
+## Лицензия
+
+MIT.
