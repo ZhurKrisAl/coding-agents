@@ -34,21 +34,19 @@ class OpenAILLM(BaseLLM):
     def invoke(self, prompt: str, **kwargs: Any) -> LLMResult:
         try:
             from langchain_openai import ChatOpenAI
-        except ImportError as e:
-            raise ImportError("langchain-openai required for OpenAILLM") from e
-
-        temperature = float(kwargs.get("temperature", self._temperature))
-
+        except ImportError as err:
+            raise ImportError("langchain-openai required for OpenAILLM") from err
+    
         llm = ChatOpenAI(
             model=self._model,
-            temperature=temperature,
-            api_key=SecretStr(self._api_key),
+            temperature=float(kwargs.get("temperature", self._temperature)),
+            api_key=self._api_key,
         )
-
+    
         msg = llm.invoke(prompt)
+        text = msg.content if hasattr(msg, "content") else str(msg)
+        if not isinstance(text, str):
+            text = str(text)
+    
+        return LLMResult(content=text)
 
-        # LangChain message usually has `.content`, but be defensive
-        content_obj = getattr(msg, "content", msg)
-        content = content_obj if isinstance(content_obj, str) else str(content_obj)
-
-        return LLMResult(content=content, raw=msg)
