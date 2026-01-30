@@ -87,14 +87,12 @@ class GitHubClient:
         repo_any = cast(Any, repo)
 
         def _fetch() -> Any:
-            # Avoid passing per_page: it may not be supported by stubs/runtime in some versions.
             if branch:
                 return repo_any.get_workflow_runs(branch=branch)
             return repo_any.get_workflow_runs()
 
         runs = self._with_retry(_fetch)
 
-        # Best-effort limiting
         try:
             return list(runs)[:per_page]
         except TypeError:
