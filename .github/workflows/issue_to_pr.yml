@@ -20,10 +20,17 @@ jobs:
         (github.event.action == 'labeled' && contains(github.event.label.name, 'agent:run'))
       ))
     runs-on: ubuntu-latest
+    
+    env:
+      CODING_AGENTS_LLM_PROVIDER: yandex
+      YANDEX_API_KEY: ${{ secrets.YANDEX_API_KEY }}
+      YANDEX_FOLDER_ID: ${{ secrets.YANDEX_FOLDER_ID }}
+    
     permissions:
       contents: write
       pull-requests: write
       issues: write
+    
     steps:
       - uses: actions/checkout@v4
         with:
