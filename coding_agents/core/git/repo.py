@@ -5,9 +5,8 @@ from __future__ import annotations
 import os
 import re
 from pathlib import Path
-from typing import List
+from typing import Any, List, Optional, cast
 
-import git
 from git import Repo
 from git.exc import GitCommandError
 
@@ -24,7 +23,7 @@ class GitRepo:
 
     def __init__(self, path: str | Path) -> None:
         self.path = Path(path)
-        self._repo: Repo | None = None
+        self._repo: Optional[Repo] = None
 
     @property
     def repo(self) -> Repo:
@@ -45,23 +44,22 @@ class GitRepo:
         """Checkout ref."""
         self.repo.git.checkout(ref)
 
-    def add(self, paths: List[str] | None = None) -> None:
+    def add(self, paths: Optional[List[str]] = None) -> None:
         """Stage paths; if None, stage all."""
         if paths:
             for p in paths:
-                self.repo.index.add(p)
+                self.repo.index.add([p])
         else:
-            self.repo.index.add("*")
+            # More reliable than "*" and matches "stage everything under repo"
+            self.repo.index.add(["."])
 
-    def commit(self, message: str, paths: List[str] | None = None) -> str:
+    def commit(self, message: str, paths: Optional[List[str]] = None) -> str:
         """Commit with message; returns commit sha."""
-        if paths:
-            self.add(paths)
-        else:
-            self.repo.index.add("*")
-        return self.repo.index.commit(message)
+        self.add(paths)
+        commit_obj = self.repo.index.commit(message)
+        return commit_obj.hexsha
 
-    def push(self, remote: str = "origin", branch: str | None = None) -> None:
+    def push(self, remote: str = "origin", branch: Optional[str] = None) -> None:
         """Push branch to remote."""
         ref = branch or self.repo.active_branch.name
         try:
@@ -73,14 +71,24 @@ class GitRepo:
                 raise
 
     def file_inventory(self, relative_to: str | Path | None = None) -> List[str]:
-        """List tracked files (paths relative to repo root or relative_to)."""
-        base = Path(relative_to) if relative_to else self.path
+        """List tracked files (paths relative to repo root).
+
+        Note: GitPython typing stubs for tree traversal are messy; we cast to Any
+        when reading .type and .path.
+        """
         out: List[str] = []
+
+        # If relative_to is provided, we still return paths relative to repo root.
+        # (You can later post-process if you want relative_to paths.)
+        _ = relative_to  # intentionally unused for now
+
         for item in self.repo.tree().traverse():
-            if item.type == "blob":
-                p = Path(item.path)
-                if not str(p).startswith(".git"):
+            it = cast(Any, item)
+            if getattr(it, "type", None) == "blob":
+                p = Path(getattr(it, "path", ""))
+                if p and not str(p).startswith(".git"):
                     out.append(str(p))
+
         return sorted(out)
 
     def list_files(self) -> List[str]:
