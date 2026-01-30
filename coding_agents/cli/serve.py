@@ -2,11 +2,14 @@
 
 from __future__ import annotations
 
+import csv
+import io
 import os
 from pathlib import Path
 from typing import Any
 
 from fastapi import FastAPI, HTTPException
+from fastapi.responses import StreamingResponse
 from pydantic import BaseModel
 
 from agents.code_agent import run_code_agent
@@ -65,6 +68,30 @@ def api_review(req: ReviewRequest) -> dict[str, Any]:
 @app.get("/health")
 def health() -> dict[str, str]:
     return {"status": "ok"}
+
+
+@app.get("/items/export/csv")
+def export_items_to_csv() -> StreamingResponse:
+    # Example data, replace with actual data retrieval logic
+    items = [
+        {"id": 1, "name": "Item 1", "description": "Description 1"},
+        {"id": 2, "name": "Item 2", "description": "Description 2"},
+    ]
+
+    output = io.StringIO()
+    writer = csv.DictWriter(output, fieldnames=["id", "name", "description"])
+    writer.writeheader()
+    for item in items:
+        writer.writerow(item)
+
+    response = StreamingResponse(
+        iter([output.getvalue()]),
+        media_type="text/csv",
+        headers={
+            "Content-Disposition": "attachment; filename=items.csv",
+        },
+    )
+    return response
 
 
 def run_serve(host: str = "0.0.0.0", port: int = 8000) -> None:
