@@ -29,7 +29,7 @@ def get_langfuse_client() -> Any | None:
                 host=os.environ.get("LANGFUSE_HOST", "https://cloud.langfuse.com"),
             )
         except Exception:
-            _LANGFUSE_CLIENT = False  # type: ignore[assignment]
+            _LANGFUSE_CLIENT = False  
     return _LANGFUSE_CLIENT if _LANGFUSE_CLIENT is not None and _LANGFUSE_CLIENT else None
 
 
