@@ -2,7 +2,6 @@
 
 import pytest
 
-
 class MockIssue:
     """Minimal mock for PyGithub Issue."""
 
@@ -13,7 +12,6 @@ class MockIssue:
         self.labels = [type("L", (), {"name": lb})() for lb in labels]
         self.state = state
 
-
 @pytest.fixture
 def sample_issue() -> MockIssue:
     return MockIssue(
@@ -22,3 +20,6 @@ def sample_issue() -> MockIssue:
         body="Add greet(name) that returns Hello, {name}!",
         labels=["enhancement"],
     )
+
+@pytest.fixture
+def csv_data():
