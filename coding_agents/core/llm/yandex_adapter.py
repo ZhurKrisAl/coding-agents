@@ -42,10 +42,15 @@ class YandexLLM(BaseLLM):
             },
             "messages": [{"role": "user", "text": prompt}],
         }
+        
         with httpx.Client() as client:
             r = client.post(url, json=payload, headers=headers, timeout=60)
-            r.raise_for_status()
+        
+            if r.status_code >= 400:
+                raise RuntimeError(f"YandexGPT error {r.status_code}: {r.text}")
+        
             data = r.json()
+
         text = ""
         for chunk in data.get("result", {}).get("alternatives", []):
             text += chunk.get("message", {}).get("text", "")
