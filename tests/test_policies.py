@@ -1,7 +1,5 @@
 """Unit tests: iteration policy and stop conditions."""
 
-import pytest
-
 from coding_agents.core.policies.iterations import IterationPolicy, StopReason
 
 
