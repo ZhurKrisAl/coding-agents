@@ -3,36 +3,29 @@
 from __future__ import annotations
 
 import os
-from typing import Any
-
-from coding_agents.core.llm.base import BaseLLM, LLMResult
+from typing import Any, Optional
 
 from pydantic import SecretStr
 
-api_key_str = api_key or os.environ.get("OPENAI_API_KEY")
-if not api_key_str:
-    raise ValueError("OPENAI_API_KEY not set")
+from coding_agents.core.llm.base import BaseLLM, LLMResult
 
-self._client = ChatOpenAI(
-    model=self._model,
-    api_key=SecretStr(api_key_str),
-    temperature=self._temperature,
-)
 
 class OpenAILLM(BaseLLM):
     """OpenAI Chat Completions; default model GPT-4o-mini."""
 
     def __init__(
         self,
-        api_key: str | None = None,
+        api_key: Optional[str] = None,
         model: str = "gpt-4o-mini",
         temperature: float = 0.2,
     ) -> None:
-        self._api_key = api_key or os.environ.get("OPENAI_API_KEY")
-        if not self._api_key:
+        api_key_str = api_key or os.environ.get("OPENAI_API_KEY")
+        if not api_key_str:
             raise ValueError("OPENAI_API_KEY not set")
-        self._model = model
-        self._temperature = temperature
+
+        self._api_key: str = api_key_str
+        self._model: str = model
+        self._temperature: float = temperature
 
     @property
     def model_name(self) -> str:
@@ -41,19 +34,21 @@ class OpenAILLM(BaseLLM):
     def invoke(self, prompt: str, **kwargs: Any) -> LLMResult:
         try:
             from langchain_openai import ChatOpenAI
-        except ImportError:
-            raise ImportError("langchain-openai required for OpenAILLM")
+        except ImportError as e:
+            raise ImportError("langchain-openai required for OpenAILLM") from e
+
+        temperature = float(kwargs.get("temperature", self._temperature))
+
         llm = ChatOpenAI(
             model=self._model,
-            temperature=kwargs.get("temperature", self._temperature),
-            api_key=self._api_key,
+            temperature=temperature,
+            api_key=SecretStr(self._api_key),
         )
-        msg = llm.invoke(prompt)
-        content = msg.content if hasattr(msg, "content") else str(msg)
-        usage = getattr(msg, "response_metadata", {}).get("usage", {}) or {}
-        text = response.content
-        if not isinstance(text, str):
-            text = str(text)
-        
-        return LLMResult(content=text, raw=response)
 
+        msg = llm.invoke(prompt)
+
+        # LangChain message usually has `.content`, but be defensive
+        content_obj = getattr(msg, "content", msg)
+        content = content_obj if isinstance(content_obj, str) else str(content_obj)
+
+        return LLMResult(content=content, raw=msg)
