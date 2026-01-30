@@ -33,6 +33,11 @@ class YandexLLM(BaseLLM):
         import httpx
         url = "https://llm.api.cloud.yandex.net/foundationModels/v1/completion"
         headers = {"Authorization": f"Api-Key {self._api_key}"}
+        folder_id = os.getenv("YANDEX_FOLDER_ID")
+        if not folder_id:
+            raise ValueError("YANDEX_FOLDER_ID not set")
+        
+        model_uri = f"gpt://{folder_id}/yandexgpt/latest"
         payload = {
             "modelUri": model_uri,
             "completionOptions": {
