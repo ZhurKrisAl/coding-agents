@@ -7,6 +7,17 @@ from typing import Any
 
 from coding_agents.core.llm.base import BaseLLM, LLMResult
 
+from pydantic import SecretStr
+
+api_key_str = api_key or os.environ.get("OPENAI_API_KEY")
+if not api_key_str:
+    raise ValueError("OPENAI_API_KEY not set")
+
+self._client = ChatOpenAI(
+    model=self._model,
+    api_key=SecretStr(api_key_str),
+    temperature=self._temperature,
+)
 
 class OpenAILLM(BaseLLM):
     """OpenAI Chat Completions; default model GPT-4o-mini."""
@@ -40,11 +51,9 @@ class OpenAILLM(BaseLLM):
         msg = llm.invoke(prompt)
         content = msg.content if hasattr(msg, "content") else str(msg)
         usage = getattr(msg, "response_metadata", {}).get("usage", {}) or {}
-        return LLMResult(
-            content=content,
-            model=self._model,
-            usage={
-                "prompt_tokens": usage.get("input_tokens", 0),
-                "completion_tokens": usage.get("output_tokens", 0),
-            },
-        )
+        text = response.content
+        if not isinstance(text, str):
+            text = str(text)
+        
+        return LLMResult(content=text, raw=response)
+
