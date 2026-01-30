@@ -6,6 +6,7 @@ import os
 import time
 from collections.abc import Callable
 from typing import TYPE_CHECKING, TypeVar
+from urllib.parse import urlparse
 
 import github
 from github import GithubException
@@ -15,6 +16,14 @@ if TYPE_CHECKING:
 
 T = TypeVar("T")
 
+def ensure_http_url(url: str) -> str:
+    u = (url or "").strip()
+    if not u:
+        return "https://api.github.com"
+    p = urlparse(u)
+    if p.scheme not in ("http", "https"):
+        raise ValueError(f"Invalid GitHub base_url (missing scheme): {u}")
+    return u
 
 def _get_token() -> str:
     token = os.environ.get("GITHUB_TOKEN")
@@ -29,7 +38,8 @@ class GitHubClient:
     def __init__(self, token: str | None = None, base_url: str | None = None) -> None:
         self._token = token or _get_token()
         self._base_url = base_url
-        self._client = github.Github(self._token, base_url=base_url or "")
+        resolved_base_url = ensure_http_url(base_url)
+        self._client = github.Github(self._token, base_url=resolved_base_url)
 
     def _with_retry(self, fn: Callable[[], T], max_retries: int = 3) -> T:
         for attempt in range(max_retries):
