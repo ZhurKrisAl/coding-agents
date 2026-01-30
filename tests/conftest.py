@@ -26,9 +26,3 @@ class MockIssue:
 @pytest.fixture
 def sample_issue() -> MockIssue:
     return MockIssue(
-        number=1,
-        title="Add greeting function",
-        body="Add greet(name) that returns Hello, {name}!",
-        labels=["enhancement"],
-        state="open",
-    )
