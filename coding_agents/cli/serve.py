@@ -2,11 +2,14 @@
 
 from __future__ import annotations
 
+import csv
+import io
 import os
 from pathlib import Path
 from typing import Any
 
 from fastapi import FastAPI, HTTPException
+from fastapi.responses import StreamingResponse
 from pydantic import BaseModel
 
 from agents.code_agent import run_code_agent
@@ -67,7 +70,24 @@ def health() -> dict[str, str]:
     return {"status": "ok"}
 
 
+@app.get("/items/export/csv")
+def export_items_to_csv() -> StreamingResponse:
+    # Example data, replace with actual data fetching logic
+    data = [
+        {"id": 1, "name": "Item 1", "description": "Description for Item 1"},
+        {"id": 2, "name": "Item 2", "description": "Description for Item 2"},
+    ]
+    output = io.StringIO()
+    writer = csv.DictWriter(output, fieldnames=data[0].keys())
+    writer.writeheader()
+    for row in data:
+        writer.writerow(row)
+    output.seek(0)
+    return StreamingResponse(output, media_type="text/csv", headers={
+        "Content-Disposition": "attachment; filename=items.csv"
+    })
+
+
 def run_serve(host: str = "0.0.0.0", port: int = 8000) -> None:
     import uvicorn
     uvicorn.run(app, host=host, port=port)
-
