@@ -34,8 +34,12 @@ class YandexLLM(BaseLLM):
         url = "https://llm.api.cloud.yandex.net/foundationModels/v1/completion"
         headers = {"Authorization": f"Api-Key {self._api_key}"}
         payload = {
-            "modelUri": f"gpt://{self._folder_id}/{self._model}",
-            "completionOptions": {"temperature": kwargs.get("temperature", self._temperature)},
+            "modelUri": model_uri,
+            "completionOptions": {
+                "temperature": self._temperature,
+                "maxTokens": str(int(os.getenv("YANDEX_MAX_TOKENS", "1024"))),
+                "stream": False,
+            },
             "messages": [{"role": "user", "text": prompt}],
         }
         with httpx.Client() as client:
