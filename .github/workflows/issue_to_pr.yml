@@ -11,6 +11,11 @@ on:
         required: true
         type: number
 
+permissions:
+  contents: write
+  pull-requests: write
+  issues: write
+
 jobs:
   code-agent:
     if: |
@@ -20,21 +25,17 @@ jobs:
         (github.event.action == 'labeled' && contains(github.event.label.name, 'agent:run'))
       ))
     runs-on: ubuntu-latest
-    
+
     env:
       CODING_AGENTS_LLM_PROVIDER: yandex
       YANDEX_API_KEY: ${{ secrets.YANDEX_API_KEY }}
       YANDEX_FOLDER_ID: ${{ secrets.YANDEX_FOLDER_ID }}
-    
-    permissions:
-      contents: write
-      pull-requests: write
-      issues: write
-    
+
     steps:
       - uses: actions/checkout@v4
         with:
-          token: ${{ secrets.GITHUB_TOKEN }}
+          # ВАЖНО: использовать встроенный токен Actions
+          token: ${{ github.token }}
           fetch-depth: 0
 
       - name: Set up Python
@@ -44,6 +45,7 @@ jobs:
 
       - name: Install dependencies
         run: |
+          python -m pip install --upgrade pip
           python -m pip install -e ".[dev]"
 
       - name: Resolve issue number
@@ -57,11 +59,8 @@ jobs:
 
       - name: Run Code Agent
         env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GITHUB_TOKEN: ${{ github.token }}
           GITHUB_REPOSITORY: ${{ github.repository }}
-          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
-          LANGFUSE_PUBLIC_KEY: ${{ secrets.LANGFUSE_PUBLIC_KEY }}
-          LANGFUSE_SECRET_KEY: ${{ secrets.LANGFUSE_SECRET_KEY }}
           GITHUB_WORKSPACE: ${{ github.workspace }}
         run: |
           coding-agents code --issue ${{ steps.issue.outputs.number }} --repo ${{ github.repository }}
