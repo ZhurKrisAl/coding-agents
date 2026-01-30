@@ -1,12 +1,21 @@
 """Pytest fixtures."""
 
+from __future__ import annotations
+
 import pytest
 
 
 class MockIssue:
     """Minimal mock for PyGithub Issue."""
 
-    def __init__(self, number: int, title: str, body: str, labels: list[str], state: str = "open"):
+    def __init__(
+        self,
+        number: int,
+        title: str,
+        body: str,
+        labels: list[str],
+        state: str = "open",
+    ) -> None:
         self.number = number
         self.title = title
         self.body = body
@@ -14,7 +23,7 @@ class MockIssue:
         self.state = state
 
 
-@pytest.fixture
+@pytest.fixture()
 def sample_issue() -> MockIssue:
     return MockIssue(
         number=1,
@@ -22,3 +31,4 @@ def sample_issue() -> MockIssue:
         body="Add greet(name) that returns Hello, {name}!",
         labels=["enhancement"],
     )
+
