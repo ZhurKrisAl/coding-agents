@@ -6,7 +6,9 @@ import os
 import time
 from collections.abc import Callable
 from typing import TYPE_CHECKING, TypeVar
+from typing import Optional
 from urllib.parse import urlparse
+from typing import Any, cast
 
 import github
 from github import GithubException
@@ -16,7 +18,10 @@ if TYPE_CHECKING:
 
 T = TypeVar("T")
 
-def ensure_http_url(url: str) -> str:
+repo_any = cast(Any, repo)
+runs = repo_any.get_workflow_runs(branch=branch or None)
+
+def ensure_http_url(url: Optional[str]) -> str:
     u = (url or "").strip()
     if not u:
         return "https://api.github.com"
@@ -41,6 +46,7 @@ class GitHubClient:
         resolved_base_url = ensure_http_url(base_url)
         self._client = github.Github(self._token, base_url=resolved_base_url)
 
+
     def _with_retry(self, fn: Callable[[], T], max_retries: int = 3) -> T:
         for attempt in range(max_retries):
             try:
@@ -57,17 +63,17 @@ class GitHubClient:
         """Get repository by owner/name."""
         return self._with_retry(lambda: self._client.get_repo(full_name))
 
-    def get_issue(self, full_name: str, issue_number: int) -> any:
+    def get_issue(self, full_name: str, issue_number: int) -> Any:
         """Get issue by repo and number."""
         repo = self.get_repo(full_name)
         return self._with_retry(lambda: repo.get_issue(issue_number))
 
-    def get_pull(self, full_name: str, pr_number: int) -> any:
+    def get_pull(self, full_name: str, pr_number: int) -> Any:
         """Get pull request by repo and number."""
         repo = self.get_repo(full_name)
         return self._with_retry(lambda: repo.get_pull(pr_number))
 
-    def create_comment(self, full_name: str, issue_or_pr_number: int, body: str) -> any:
+    def create_comment(self, full_name: str, issue_or_pr_number: int, body: str) -> Any:
         """Create comment on issue or PR."""
         repo = self.get_repo(full_name)
         issue = self._with_retry(lambda: repo.get_issue(issue_or_pr_number))
@@ -75,7 +81,7 @@ class GitHubClient:
 
     def list_workflow_runs(
         self, full_name: str, branch: str | None = None, per_page: int = 10
-    ) -> any:
+    ) -> Any:
         """List recent workflow runs for repo (optionally for branch)."""
         repo = self.get_repo(full_name)
         return self._with_retry(
