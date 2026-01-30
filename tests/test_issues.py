@@ -1,7 +1,5 @@
 """Unit tests: parsing Issue context."""
 
-import pytest
-
 from coding_agents.core.github.issues import get_issue_context
 from tests.conftest import MockIssue
 
