@@ -70,4 +70,3 @@ def health() -> dict[str, str]:
 def run_serve(host: str = "0.0.0.0", port: int = 8000) -> None:
     import uvicorn
     uvicorn.run(app, host=host, port=port)
-
