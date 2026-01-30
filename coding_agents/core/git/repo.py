@@ -47,13 +47,38 @@ class GitRepo:
         self.repo.git.checkout(ref)
 
     def add(self, paths: Optional[List[str]] = None) -> None:
-        """Stage paths; if None, stage all."""
+        """Stage paths; if None, stage all safe changes.
+
+        We explicitly exclude .git* and common build artifacts to avoid GitHub push rejection.
+        """
+        # If explicit paths provided - stage only them (but still guard against .git)
         if paths:
-            for p in paths:
-                self.repo.index.add([p])
-        else:
-            # More reliable than "*" and matches "stage everything under repo"
-            self.repo.index.add(["."])
+            safe = [p for p in paths if ".git" not in p and not p.startswith(".git")]
+            if safe:
+                self.repo.index.add(safe)
+            return
+
+        self.repo.git.add("-A")
+
+        try:
+            self.repo.git.reset("HEAD", "--", ".git")
+        except Exception:
+            pass
+
+        for p in [
+            ".venv",
+            "venv",
+            "__pycache__",
+            ".pytest_cache",
+            ".mypy_cache",
+            ".ruff_cache",
+            ".DS_Store",
+        ]:
+            try:
+                self.repo.git.reset("HEAD", "--", p)
+            except Exception:
+                pass
+
 
     def commit(self, message: str, paths: Optional[List[str]] = None) -> str:
         """Commit with message; returns commit sha."""
