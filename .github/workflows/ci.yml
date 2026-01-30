@@ -70,7 +70,17 @@ jobs:
     if: always() && !cancelled()
     runs-on: ubuntu-latest
     steps:
+      - name: Generate GitHub App token (Reviewer)
+        id: review-token
+        uses: actions/create-github-app-token@v1
+        with:
+          app-id: ${{ secrets.REVIEW_APP_ID }}
+          private-key: ${{ secrets.REVIEW_APP_PRIVATE_KEY }}
+
       - uses: actions/checkout@v4
+        with:
+          token: ${{ steps.review-token.outputs.token }}
+
 
       - uses: actions/setup-python@v5
         with:
@@ -94,9 +104,9 @@ jobs:
 
       - name: Run Reviewer Agent
         env:
-          GITHUB_TOKEN: ${{ github.token }}
+          GITHUB_TOKEN: ${{ steps.review-token.outputs.token }}
           GITHUB_REPOSITORY: ${{ github.repository }}
-
+          
           CODING_AGENTS_LLM_PROVIDER: yandex
           YANDEX_API_KEY: ${{ secrets.YANDEX_API_KEY }}
           YANDEX_FOLDER_ID: ${{ secrets.YANDEX_FOLDER_ID }}
