@@ -10,6 +10,8 @@ from typing import Any, List, Optional, cast
 from git import Repo
 from git.exc import GitCommandError
 
+import time
+from typing import Optional
 
 def _slug(s: str, max_len: int = 30) -> str:
     """Safe branch slug from title."""
@@ -60,15 +62,40 @@ class GitRepo:
         return commit_obj.hexsha
 
     def push(self, remote: str = "origin", branch: Optional[str] = None) -> None:
-        """Push branch to remote."""
+        """Push branch to remote with retries (more reliable in GitHub Actions)."""
         ref = branch or self.repo.active_branch.name
-        try:
-            self.repo.remote(remote).push(ref)
-        except GitCommandError as e:
-            if "rejected" in str(e).lower():
-                self.repo.remote(remote).push(ref, force_with_lease=True)
-            else:
+
+        token = os.environ.get("GITHUB_TOKEN")
+        repo_full = os.environ.get("GITHUB_REPOSITORY")  # owner/repo
+        push_url: Optional[str] = None
+        if token and repo_full:
+            push_url = f"https://x-access-token:{token}@github.com/{repo_full}.git"
+
+        last_err: Optional[Exception] = None
+        for attempt in range(3):
+            try:
+                if push_url:
+                    # push explicitly to URL (bypasses potentially odd origin config)
+                    self.repo.git.push("--porcelain", push_url, ref)
+                else:
+                    self.repo.remote(remote).push(ref)
+                return
+            except GitCommandError as e:
+                last_err = e
+                msg = str(e).lower()
+                if any(x in msg for x in ["rpc failed", "http 500", "hung up", "internal server error"]):
+                    time.sleep(5 * (attempt + 1))
+                    continue
+                if "rejected" in msg:
+                    if push_url:
+                        self.repo.git.push("--porcelain", "--force-with-lease", push_url, ref)
+                    else:
+                        self.repo.remote(remote).push(ref, force_with_lease=True)
+                    return
                 raise
+
+        raise RuntimeError(f"Push failed after retries: {last_err}")
+
 
     def file_inventory(self, relative_to: str | Path | None = None) -> List[str]:
         """List tracked files (paths relative to repo root).
